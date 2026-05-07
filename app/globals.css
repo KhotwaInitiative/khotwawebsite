@@ -1,0 +1,157 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== Base Styles ===== */
+:root {
+  --brand-color: #800020;
+  --brand-light: #a31a3f;
+  --brand-dark: #5a0014;
+}
+
+body {
+  @apply antialiased;
+}
+
+/* ===== Scroll Reveal Animation ===== */
+.reveal {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: all 0.8s cubic-bezier(0.5, 0, 0, 1);
+}
+
+.reveal.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ===== Animated Background (Registration) ===== */
+.animated-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  background: linear-gradient(-45deg, #f5f5f7, #ffd6e0, #f5f5f7, #e2e8f0);
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
+}
+
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ===== Nav hide on scroll ===== */
+.nav-hidden {
+  transform: translateX(-50%) translateY(-150%) !important;
+}
+
+/* ===== Registration Form Styles ===== */
+.step-card {
+  display: none;
+  opacity: 0;
+  transform: translateX(15px);
+  animation: fadeSlideIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+html[dir="rtl"] .step-card {
+  transform: translateX(-15px);
+}
+
+.step-card.active {
+  display: block;
+}
+
+@keyframes fadeSlideIn {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ===== File Upload Drop Area ===== */
+.file-drop-area {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  background-color: #fafafa;
+  border: 2px dashed #d2d2d7;
+  border-radius: 16px;
+  transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  cursor: pointer;
+  text-align: center;
+}
+
+.file-drop-area:hover,
+.file-drop-area.dragover {
+  background-color: rgba(128, 0, 32, 0.03);
+  border-color: #800020;
+}
+
+.file-drop-area input[type="file"] {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ===== Custom Radio Buttons ===== */
+.custom-radio {
+  height: 24px;
+  width: 24px;
+  background-color: #fafafa;
+  border: 2px solid #d2d2d7;
+  border-radius: 50%;
+  display: inline-block;
+  position: relative;
+  transition: all 0.2s;
+}
+
+html[dir="rtl"] .custom-radio {
+  margin-right: 0;
+  margin-left: 10px;
+}
+
+html[dir="ltr"] .custom-radio {
+  margin-right: 10px;
+  margin-left: 0;
+}
+
+.custom-radio::after {
+  content: "";
+  position: absolute;
+  display: none;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #800020;
+}
+
+input[type="radio"]:checked ~ .custom-radio {
+  border-color: #800020;
+}
+
+input[type="radio"]:checked ~ .custom-radio::after {
+  display: block;
+}
+
+/* ===== Reduced Motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    transition-duration: 0.01ms !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
