@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, FormEvent, ChangeEvent, DragEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Lock, CheckCircle, UploadCloud, GripVertical } from "lucide-react";
+import { Lock, CheckCircle, UploadCloud, GripVertical, ChevronUp, ChevronDown, X } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 
 const TOTAL_STEPS = 4;
@@ -48,6 +48,13 @@ export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [expandedDetails, setExpandedDetails] = useState(false);
+  const [showError, setShowError] = useState(false);
+  const [errorType, setErrorType] = useState<"client" | "server">("client");
+  const [errorTitle, setErrorTitle] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [errorDetails, setErrorDetails] = useState<string[]>([]);
 
   // Form data - Step 1: Personal Information
   const [fullNameAr, setFullNameAr] = useState("");
@@ -93,12 +100,14 @@ export default function RegisterPage() {
   // --- Navigation ---
   const goNext = () => {
     if (currentStep < TOTAL_STEPS - 1) {
+      setShowConfirmation(false);
       setCurrentStep((s) => s + 1);
     }
   };
 
   const goPrev = () => {
     if (currentStep > 0) {
+      setShowConfirmation(false);
       setCurrentStep((s) => s - 1);
     }
   };
@@ -182,11 +191,125 @@ export default function RegisterPage() {
     setDraggedItemId(null);
   };
 
-  // --- Submit ---
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (currentStep !== TOTAL_STEPS - 1 || !cvFile) return;
+  // --- Mobile reordering (up/down arrows) ---
+  const moveItemUp = (itemId: string, listType: "companies" | "jobs") => {
+    const list = listType === "companies" ? companiesOrder : jobTitlesOrder;
+    const idx = list.findIndex((item) => item.id === itemId);
+    if (idx <= 0) return;
 
+    const newList = [...list];
+    [newList[idx], newList[idx - 1]] = [newList[idx - 1], newList[idx]];
+    newList.forEach((item, i) => {
+      item.order = i + 1;
+    });
+
+    if (listType === "companies") {
+      setCompaniesOrder(newList);
+    } else {
+      setJobTitlesOrder(newList);
+    }
+  };
+
+  const moveItemDown = (itemId: string, listType: "companies" | "jobs") => {
+    const list = listType === "companies" ? companiesOrder : jobTitlesOrder;
+    const idx = list.findIndex((item) => item.id === itemId);
+    if (idx >= list.length - 1) return;
+
+    const newList = [...list];
+    [newList[idx], newList[idx + 1]] = [newList[idx + 1], newList[idx]];
+    newList.forEach((item, i) => {
+      item.order = i + 1;
+    });
+
+    if (listType === "companies") {
+      setCompaniesOrder(newList);
+    } else {
+      setJobTitlesOrder(newList);
+    }
+  };
+
+  // --- Submit ---
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (currentStep !== TOTAL_STEPS - 1) return;
+
+    // Client-side validation
+    const missingFields: string[] = [];
+    
+    if (!fullNameEn) missingFields.push(lang === "ar" ? "الاسم بالإنجليزية" : "Name in English");
+    if (!fullNameAr) missingFields.push(lang === "ar" ? "الاسم بالعربية" : "Name in Arabic");
+    if (!birthDate) missingFields.push(lang === "ar" ? "تاريخ الميلاد" : "Birth Date");
+    if (!gender) missingFields.push(lang === "ar" ? "الجنس" : "Gender");
+    if (!email) missingFields.push(lang === "ar" ? "البريد الإلكتروني" : "Email");
+    if (!phoneNumber) missingFields.push(lang === "ar" ? "رقم الهاتف" : "Phone Number");
+    if (!university) missingFields.push(lang === "ar" ? "الجامعة" : "University");
+    if (!major) missingFields.push(lang === "ar" ? "التخصص" : "Major");
+    if (!uniId) missingFields.push(lang === "ar" ? "رقم الهوية الجامعية" : "University ID");
+    if (!graduationYear) missingFields.push(lang === "ar" ? "سنة التخرج" : "Graduation Year");
+
+    if (!cvFile) {
+      missingFields.push(lang === "ar" ? "ملف السيرة الذاتية" : "CV File");
+    } else {
+      // Check CV file size (limit to 10MB)
+      const maxSizeMB = 10;
+      const maxSizeBytes = maxSizeMB * 1024 * 1024;
+      if (cvFile.size > maxSizeBytes) {
+        setErrorType("client");
+        setErrorTitle(lang === "ar" ? "حجم الملف كبير جداً" : "File Size Too Large");
+        setErrorMessage(lang === "ar" 
+          ? `حجم ملف السيرة الذاتية يجب أن لا يزيد عن ${maxSizeMB}MB` 
+          : `CV file size must not exceed ${maxSizeMB}MB`);
+        setErrorDetails([lang === "ar" 
+          ? `حجم الملف الحالي: ${(cvFile.size / 1024 / 1024).toFixed(2)}MB` 
+          : `Current file size: ${(cvFile.size / 1024 / 1024).toFixed(2)}MB`]);
+        setShowError(true);
+        return;
+      }
+      
+      // Check file type
+      const allowedTypes = ["application/pdf", "image/jpeg", "image/png"];
+      if (!allowedTypes.includes(cvFile.type)) {
+        setErrorType("client");
+        setErrorTitle(lang === "ar" ? "نوع الملف غير مدعوم" : "Unsupported File Type");
+        setErrorMessage(lang === "ar" 
+          ? "يرجى استخدام ملفات PDF أو صور (JPG/PNG)" 
+          : "Please use PDF or image files (JPG/PNG)");
+        setErrorDetails([cvFile.type || "Unknown"]);
+        setShowError(true);
+        return;
+      }
+    }
+
+    if (missingFields.length > 0) {
+      setErrorType("client");
+      setErrorTitle(lang === "ar" ? "حقول مفقودة" : "Missing Required Fields");
+      setErrorMessage(lang === "ar" 
+        ? "يرجى ملء جميع الحقول المطلوبة:" 
+        : "Please fill in all required fields:");
+      setErrorDetails(missingFields);
+      setShowError(true);
+      return;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setErrorType("client");
+      setErrorTitle(lang === "ar" ? "بريد إلكتروني غير صحيح" : "Invalid Email");
+      setErrorMessage(lang === "ar" 
+        ? "يرجى إدخال بريد إلكتروني صحيح" 
+        : "Please enter a valid email address");
+      setErrorDetails([email]);
+      setShowError(true);
+      return;
+    }
+
+    // All validations passed, show confirmation
+    setShowConfirmation(true);
+  };
+
+  const handleConfirmedSubmit = async () => {
+    setShowConfirmation(false);
     setIsSubmitting(true);
 
     try {
@@ -221,7 +344,7 @@ export default function RegisterPage() {
       formData.append("companies_order", companiesOrderedString);
       formData.append("job_titles_order", jobTitlesOrderedString);
       // CV
-      formData.append("cv_file", cvFile);
+      formData.append("cv_file", cvFile!);
 
       const response = await fetch("/api/register", {
         method: "POST",
@@ -231,23 +354,63 @@ export default function RegisterPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to submit registration");
+        // Server error - show friendly error dialog
+        let errorMsg = result.error || "Failed to submit registration";
+        let errorDetail = "";
+
+        // Parse common server errors
+        if (errorMsg.includes("email") || errorMsg.toLowerCase().includes("already exists")) {
+          setErrorTitle(lang === "ar" ? "البريد الإلكتروني مسجل بالفعل" : "Email Already Registered");
+          errorDetail = lang === "ar" 
+            ? "هذا البريد الإلكتروني مسجل بالفعل في النظام" 
+            : "This email is already registered in the system";
+        } else if (errorMsg.includes("database") || errorMsg.includes("server")) {
+          setErrorTitle(lang === "ar" ? "خطأ في الخادم" : "Server Error");
+          errorDetail = lang === "ar" 
+            ? "حدث خطأ في الخادم. يرجى المحاولة لاحقاً" 
+            : "A server error occurred. Please try again later";
+        } else if (errorMsg.includes("file") || errorMsg.includes("upload")) {
+          setErrorTitle(lang === "ar" ? "خطأ في رفع الملف" : "File Upload Error");
+          errorDetail = lang === "ar" 
+            ? "حدث خطأ أثناء رفع الملف. تأكد من صحة الملف" 
+            : "An error occurred while uploading the file. Please check your file";
+        } else {
+          setErrorTitle(lang === "ar" ? "خطأ في التسجيل" : "Registration Error");
+          errorDetail = errorMsg;
+        }
+
+        setErrorType("server");
+        setErrorMessage(errorDetail);
+        setErrorDetails([result.error || "Unknown error"]);
+        setShowError(true);
+        return;
       }
 
       if (!result?.success || !result?.registration?.id) {
-        throw new Error("Unexpected response from registration service");
+        setErrorType("server");
+        setErrorTitle(lang === "ar" ? "استجابة غير متوقعة" : "Unexpected Response");
+        setErrorMessage(lang === "ar" 
+          ? "تم التسجيل ولكن لم نتمكن من تأكيد النجاح" 
+          : "Registration processed but confirmation failed");
+        setErrorDetails([]);
+        setShowError(true);
+        return;
       }
 
       // Success
       setShowSuccess(true);
     } catch (error: unknown) {
       console.error("Registration Error:", error);
-      const msg =
-        lang === "ar"
-          ? "حدث خطأ أثناء التسجيل. يرجى المحاولة مرة أخرى."
-          : "An error occurred during registration. Please try again.";
+      
+      setErrorType("server");
+      setErrorTitle(lang === "ar" ? "خطأ في الاتصال" : "Connection Error");
+      setErrorMessage(lang === "ar" 
+        ? "حدث خطأ أثناء الاتصال بالخادم. تحقق من اتصالك بالإنترنت" 
+        : "A network error occurred. Please check your internet connection");
+      
       const devMsg = error instanceof Error ? error.message : JSON.stringify(error);
-      alert(`${msg}\n\n${devMsg}`);
+      setErrorDetails([devMsg]);
+      setShowError(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -300,10 +463,210 @@ export default function RegisterPage() {
     );
   }
 
+  // --- Confirmation Modal ---
+  // --- Error Modal ---
+  const ErrorModal = () => (
+    <>
+      {/* Backdrop */}
+      {showError && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity duration-300"
+          onClick={() => setShowError(false)}
+        />
+      )}
+
+      {/* Modal */}
+      {showError && (
+        <div className="fixed inset-0 flex items-center justify-center p-4 z-50 pointer-events-none">
+          <div className="pointer-events-auto bg-white/95 backdrop-blur-xl border border-white/40 rounded-3xl shadow-2xl p-6 sm:p-8 max-w-md w-full transform transition-all duration-300 animate-modal-in">
+            {/* Close Button */}
+            <button
+              onClick={() => setShowError(false)}
+              className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition text-gray-500 hover:text-gray-700"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Error Icon & Title */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                errorType === "client" 
+                  ? "bg-amber-50" 
+                  : "bg-red-50"
+              }`}>
+                <svg
+                  className={`w-6 h-6 ${
+                    errorType === "client" 
+                      ? "text-amber-600" 
+                      : "text-red-600"
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">{errorTitle}</h2>
+                <p className={`text-sm font-semibold ${
+                  errorType === "client" 
+                    ? "text-amber-600" 
+                    : "text-red-600"
+                }`}>
+                  {errorType === "client" 
+                    ? (lang === "ar" ? "خطأ من جانبك" : "Your Input Issue") 
+                    : (lang === "ar" ? "خطأ في الخادم" : "Server Issue")}
+                </p>
+              </div>
+            </div>
+
+            {/* Main Message */}
+            <p className="text-gray-700 mb-4 leading-relaxed">{errorMessage}</p>
+
+            {/* Error Details */}
+            {errorDetails.length > 0 && (
+              <div className={`mb-6 rounded-2xl p-4 text-sm space-y-2 ${
+                errorType === "client" 
+                  ? "bg-amber-50/50 border border-amber-100" 
+                  : "bg-red-50/50 border border-red-100"
+              }`}>
+                {errorDetails.map((detail, idx) => (
+                  <div key={idx} className="flex items-start gap-2">
+                    <span className={`text-lg font-bold mt-0.5 ${
+                      errorType === "client" 
+                        ? "text-amber-600" 
+                        : "text-red-600"
+                    }`}>
+                      •
+                    </span>
+                    <span className="text-gray-700">{detail}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Help Text */}
+            {errorType === "server" && (
+              <div className="mb-6 text-xs text-gray-600 bg-blue-50 rounded-lg p-3 border border-blue-100">
+                <p className="font-semibold mb-1">
+                  {lang === "ar" ? "ما العمل؟" : "What to do?"}
+                </p>
+                <p>
+                  {lang === "ar" 
+                    ? "تحقق من اتصالك بالإنترنت وحاول مرة أخرى. إذا استمرت المشكلة، تواصل معنا." 
+                    : "Check your internet connection and try again. If the issue persists, contact support."}
+                </p>
+              </div>
+            )}
+
+            {/* Close Button */}
+            <button
+              onClick={() => setShowError(false)}
+              className="w-full px-4 py-3 bg-gray-900 text-white font-semibold rounded-full hover:bg-black transition-all duration-200"
+            >
+              {lang === "ar" ? "فهمت" : "Got it"}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  const ConfirmationModal = () => (
+    <>
+      {/* Backdrop */}
+      {showConfirmation && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity duration-300"
+          onClick={() => setShowConfirmation(false)}
+        />
+      )}
+
+      {/* Modal */}
+      {showConfirmation && (
+        <div className="fixed inset-0 flex items-center justify-center p-4 z-50 pointer-events-none">
+          <div className="pointer-events-auto bg-white/95 backdrop-blur-xl border border-white/40 rounded-3xl shadow-2xl p-6 sm:p-8 max-w-md w-full transform transition-all duration-300 animate-modal-in">
+            {/* Close Button */}
+            <button
+              onClick={() => setShowConfirmation(false)}
+              className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition text-gray-500 hover:text-gray-700"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">{lang === "ar" ? "تأكيد التسجيل" : "Confirm Registration"}</h2>
+            <p className="text-gray-500 text-sm mb-6">{lang === "ar" ? "يرجى التحقق من بيانات التسجيل" : "Please review your registration details"}</p>
+
+            {/* Key Information */}
+            <div className="space-y-3 mb-6 bg-gray-50 rounded-2xl p-4">
+              <div>
+                <p className="text-xs text-gray-500 font-semibold">{lang === "ar" ? "الاسم" : "Name"}</p>
+                <p className="text-gray-800 font-semibold">{fullNameEn} {fullNameAr && `(${fullNameAr})`}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-semibold">{lang === "ar" ? "البريد الإلكتروني" : "Email"}</p>
+                <p className="text-gray-800 font-semibold break-all">{email}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-semibold">{lang === "ar" ? "أفضل شركة" : "Top Company"}</p>
+                <p className="text-gray-800 font-semibold">{companiesOrder[0]?.label}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-semibold">{lang === "ar" ? "أفضل وظيفة" : "Top Job Title"}</p>
+                <p className="text-gray-800 font-semibold">{jobTitlesOrder[0]?.label}</p>
+              </div>
+            </div>
+
+            {/* More Details Toggle */}
+            <button
+              onClick={() => setExpandedDetails(!expandedDetails)}
+              className="w-full flex items-center justify-center gap-2 text-brand hover:text-brand-light font-semibold text-sm mb-6 transition"
+            >
+              {expandedDetails ? (lang === "ar" ? "إخفاء التفاصيل" : "Hide Details") : (lang === "ar" ? "عرض المزيد" : "More Details")}
+              <ChevronDown className={`w-4 h-4 transition-transform ${expandedDetails ? "rotate-180" : ""}`} />
+            </button>
+
+            {/* Expanded Details */}
+            {expandedDetails && (
+              <div className="mb-6 bg-blue-50/50 rounded-2xl p-4 max-h-48 overflow-y-auto space-y-2 text-sm">
+                <div><span className="text-gray-600">{lang === "ar" ? "تاريخ الميلاد:" : "Birth Date:"}</span> <span className="text-gray-800 font-semibold">{birthDate}</span></div>
+                <div><span className="text-gray-600">{lang === "ar" ? "الجنس:" : "Gender:"}</span> <span className="text-gray-800 font-semibold">{gender}</span></div>
+                <div><span className="text-gray-600">{lang === "ar" ? "الجامعة:" : "University:"}</span> <span className="text-gray-800 font-semibold">{university}</span></div>
+                <div><span className="text-gray-600">{lang === "ar" ? "التخصص:" : "Major:"}</span> <span className="text-gray-800 font-semibold">{major}</span></div>
+                <div><span className="text-gray-600">{lang === "ar" ? "سنة التخرج:" : "Graduation Year:"}</span> <span className="text-gray-800 font-semibold">{graduationYear}</span></div>
+                <div><span className="text-gray-600">{lang === "ar" ? "الاهتمامات:" : "Interests:"}</span> <span className="text-gray-800 font-semibold">{interests?.substring(0, 50)}...</span></div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirmation(false)}
+                className="flex-1 px-4 py-3 text-gray-600 font-semibold rounded-full border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200"
+              >
+                {lang === "ar" ? "إلغاء" : "Cancel"}
+              </button>
+              <button
+                onClick={handleConfirmedSubmit}
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-3 bg-brand text-white font-semibold rounded-full hover:bg-brand-light transition-all duration-200 shadow-md shadow-brand/25 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (lang === "ar" ? "جاري الإرسال..." : "Submitting...") : (lang === "ar" ? "تأكيد" : "Confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   // --- Form View ---
   return (
     <div className="min-h-screen flex flex-col items-center p-4 pt-8 pb-12 relative">
       <div className="animated-bg" />
+      <ErrorModal />
+      <ConfirmationModal />
 
       <div className="relative z-10 w-full max-w-[580px]">
         {/* Header */}
@@ -643,9 +1006,10 @@ export default function RegisterPage() {
                     <label className="block text-sm font-semibold text-gray-800 mb-4">
                       {t("regCompanies")}
                     </label>
-                    <p className="text-xs text-gray-500 mb-3">{t("regDragInstruction")}</p>
+                    <p className="text-xs text-gray-500 mb-3 hidden md:block">{t("regDragInstruction")}</p>
+                    <p className="text-xs text-gray-500 mb-3 md:hidden">{lang === "ar" ? "استخدم الأزرار للترتيب" : "Use arrows to reorder"}</p>
                     <div className="space-y-2">
-                      {companiesOrder.map((company) => (
+                      {companiesOrder.map((company, idx) => (
                         <div
                           key={company.id}
                           draggable
@@ -654,17 +1018,40 @@ export default function RegisterPage() {
                           onDragOver={handleDragOver}
                           onDrop={(e) => handleDropOrder(e, company.id, "companies")}
                           onDragEnd={handleDragEnd}
-                          className={`flex items-center gap-3 p-4 bg-gray-50 border-2 border-gray-200 rounded-xl cursor-move transition ${
+                          className={`flex items-center gap-3 p-3 sm:p-4 bg-gradient-to-r from-gray-50 to-gray-50 border-2 border-gray-200 rounded-xl transition-all duration-200 ${
                             draggedItemId === company.id
-                              ? "opacity-50 border-brand bg-brand/5"
-                              : "hover:border-brand/30 hover:bg-brand/5"
+                              ? "opacity-50 border-brand bg-gradient-to-r from-brand/10 to-brand/5 shadow-md"
+                              : "hover:border-brand/50 hover:bg-gradient-to-r hover:from-brand/5 hover:to-brand/5 hover:shadow-sm"
                           }`}
                         >
-                          <GripVertical className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                          <span className="font-semibold text-gray-700 min-w-8">
-                            {company.order}.
-                          </span>
-                          <span className="font-semibold text-gray-800 flex-1">{company.label}</span>
+                          {/* Desktop: Drag Handle */}
+                          <GripVertical className="w-5 h-5 text-gray-400 flex-shrink-0 hidden md:block" />
+                          
+                          {/* Order Number */}
+                          <span className="font-bold text-lg text-brand min-w-8">{company.order}.</span>
+                          
+                          {/* Company Name */}
+                          <span className="font-semibold text-gray-800 flex-1 text-sm sm:text-base">{company.label}</span>
+                          
+                          {/* Mobile: Arrow Buttons */}
+                          <div className="flex md:hidden gap-1">
+                            <button
+                              type="button"
+                              onClick={() => moveItemUp(company.id, "companies")}
+                              disabled={idx === 0}
+                              className="p-2 rounded-lg bg-white border border-gray-200 hover:border-brand/50 hover:bg-brand/5 text-gray-600 hover:text-brand transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 duration-150"
+                            >
+                              <ChevronUp className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveItemDown(company.id, "companies")}
+                              disabled={idx === companiesOrder.length - 1}
+                              className="p-2 rounded-lg bg-white border border-gray-200 hover:border-brand/50 hover:bg-brand/5 text-gray-600 hover:text-brand transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 duration-150"
+                            >
+                              <ChevronDown className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -675,9 +1062,10 @@ export default function RegisterPage() {
                     <label className="block text-sm font-semibold text-gray-800 mb-4">
                       {t("regJobTitles")}
                     </label>
-                    <p className="text-xs text-gray-500 mb-3">{t("regDragInstruction")}</p>
+                    <p className="text-xs text-gray-500 mb-3 hidden md:block">{t("regDragInstruction")}</p>
+                    <p className="text-xs text-gray-500 mb-3 md:hidden">{lang === "ar" ? "استخدم الأزرار للترتيب" : "Use arrows to reorder"}</p>
                     <div className="space-y-2">
-                      {jobTitlesOrder.map((job) => (
+                      {jobTitlesOrder.map((job, idx) => (
                         <div
                           key={job.id}
                           draggable
@@ -686,17 +1074,40 @@ export default function RegisterPage() {
                           onDragOver={handleDragOver}
                           onDrop={(e) => handleDropOrder(e, job.id, "jobs")}
                           onDragEnd={handleDragEnd}
-                          className={`flex items-center gap-3 p-4 bg-gray-50 border-2 border-gray-200 rounded-xl cursor-move transition ${
+                          className={`flex items-center gap-3 p-3 sm:p-4 bg-gradient-to-r from-gray-50 to-gray-50 border-2 border-gray-200 rounded-xl transition-all duration-200 ${
                             draggedItemId === job.id
-                              ? "opacity-50 border-brand bg-brand/5"
-                              : "hover:border-brand/30 hover:bg-brand/5"
+                              ? "opacity-50 border-brand bg-gradient-to-r from-brand/10 to-brand/5 shadow-md"
+                              : "hover:border-brand/50 hover:bg-gradient-to-r hover:from-brand/5 hover:to-brand/5 hover:shadow-sm"
                           }`}
                         >
-                          <GripVertical className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                          <span className="font-semibold text-gray-700 min-w-8">
-                            {job.order}.
-                          </span>
-                          <span className="font-semibold text-gray-800 flex-1">{job.label}</span>
+                          {/* Desktop: Drag Handle */}
+                          <GripVertical className="w-5 h-5 text-gray-400 flex-shrink-0 hidden md:block" />
+                          
+                          {/* Order Number */}
+                          <span className="font-bold text-lg text-brand min-w-8">{job.order}.</span>
+                          
+                          {/* Job Title */}
+                          <span className="font-semibold text-gray-800 flex-1 text-sm sm:text-base">{job.label}</span>
+                          
+                          {/* Mobile: Arrow Buttons */}
+                          <div className="flex md:hidden gap-1">
+                            <button
+                              type="button"
+                              onClick={() => moveItemUp(job.id, "jobs")}
+                              disabled={idx === 0}
+                              className="p-2 rounded-lg bg-white border border-gray-200 hover:border-brand/50 hover:bg-brand/5 text-gray-600 hover:text-brand transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 duration-150"
+                            >
+                              <ChevronUp className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveItemDown(job.id, "jobs")}
+                              disabled={idx === jobTitlesOrder.length - 1}
+                              className="p-2 rounded-lg bg-white border border-gray-200 hover:border-brand/50 hover:bg-brand/5 text-gray-600 hover:text-brand transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 duration-150"
+                            >
+                              <ChevronDown className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

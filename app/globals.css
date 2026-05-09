@@ -155,3 +155,74 @@ input[type="radio"]:checked ~ .custom-radio::after {
     transform: none !important;
   }
 }
+
+/* ===== Modal Animations ===== */
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-in {
+  animation: modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ===== Smooth Transitions for Reordering ===== */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.duration-150 {
+  transition-duration: 150ms;
+}
+
+.duration-200 {
+  transition-duration: 200ms;
+}
+
+.active\:scale-95:active {
+  transform: scale(0.95);
+}
+
+/* ===== Chevron Rotation Animation ===== */
+.rotate-180 {
+  transform: rotate(180deg);
+}
+
+/* ===== Enhanced Button States ===== */
+button:disabled {
+  pointer-events: none;
+}
+
+/* ===== Stagger Item Animation for Lists ===== */
+@keyframes itemStagger {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-item-stagger {
+  animation: itemStagger 0.3s ease-out;
+}
+
+/* Mobile-specific optimizations */
+@media (max-width: 768px) {
+  .step-card {
+    animation-duration: 0.3s;
+  }
+
+  button[type="button"] {
+    min-height: 44px;
+  }
+}
