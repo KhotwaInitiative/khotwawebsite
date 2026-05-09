@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, FormEvent, ChangeEvent, DragEvent } from "react";
+import { useState, useRef, FormEvent, ChangeEvent, DragEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Lock, CheckCircle, UploadCloud, GripVertical, ChevronUp, ChevronDown, X } from "lucide-react";
@@ -355,8 +355,8 @@ export default function RegisterPage() {
 
       if (!response.ok) {
         // Server error - show friendly error dialog
-        let errorMsg = result.error || "Failed to submit registration";
-        let errorDetail = "";
+        const errorMsg = result.error || "Failed to submit registration";
+        const errorDetail = "";
 
         // Parse common server errors
         if (errorMsg.includes("email") || errorMsg.toLowerCase().includes("already exists")) {
