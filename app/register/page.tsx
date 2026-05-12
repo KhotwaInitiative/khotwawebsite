@@ -356,7 +356,7 @@ export default function RegisterPage() {
       if (!response.ok) {
         // Server error - show friendly error dialog
         const errorMsg = result.error || "Failed to submit registration";
-        const errorDetail = "";
+        let errorDetail = "";
 
         // Parse common server errors
         if (errorMsg.includes("email") || errorMsg.toLowerCase().includes("already exists")) {
