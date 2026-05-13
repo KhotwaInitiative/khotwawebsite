@@ -10,7 +10,8 @@
     "setup:supabase": "node scripts/setup-supabase.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.4",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.105.4",
     "lucide-react": "^0.511.0",
     "next": "^15.3.0",
     "react": "^19.1.0",
